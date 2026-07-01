@@ -5,8 +5,6 @@ Sends pre-approved template messages via the Meta WhatsApp Business Cloud API.
 Required .env keys:
     WHATSAPP_PHONE_NUMBER_ID  — your Meta Phone Number ID
     WHATSAPP_ACCESS_TOKEN     — your Meta System User / Page Access Token
-    WA_WELCOME_TEMPLATE       — approved template name for welcome message
-    WA_BIRTHDAY_TEMPLATE      — approved template name for birthday message
 """
 
 import os
@@ -19,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 _PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 _ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
-_WELCOME_TEMPLATE = os.getenv("WA_WELCOME_TEMPLATE", "welcome_client")
-_BIRTHDAY_TEMPLATE = os.getenv("WA_BIRTHDAY_TEMPLATE", "birthday_client")
+_WELCOME_TEMPLATE = "welcome_client"
+_BIRTHDAY_TEMPLATE = "birthday_client"
 _LANG = "en_US"
 
 _API_URL = f"https://graph.facebook.com/v19.0/{_PHONE_NUMBER_ID}/messages"
