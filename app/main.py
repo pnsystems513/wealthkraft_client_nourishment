@@ -55,8 +55,6 @@ if _raw_origins:
 else:
     ALLOWED_ORIGINS = []
 
-logger.info("[CORS] Allowed origins: %s", ALLOWED_ORIGINS)
-
 # ─────────────────────────────────────────────
 # App
 # ─────────────────────────────────────────────

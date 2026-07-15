@@ -91,8 +91,6 @@ def welcome_job() -> None:
     the welcome email. Uses last_stage_changed_at as the watermark so the same
     lead is never processed twice.
     """
-    logger.info("[WelcomeJob] Starting run at %s", datetime.now(timezone.utc).isoformat())
-
     state = _load_state()
     ts_str = state.get("last_created_at")
     watermark = datetime.fromisoformat(ts_str) if ts_str else None  # datetime | None — last processed last_stage_changed_at
@@ -115,7 +113,6 @@ def welcome_job() -> None:
         new_leads: list[Lead] = query.all()
 
         if not new_leads:
-            logger.info("[WelcomeJob] No newly converted leads found.")
             return
 
         logger.info("[WelcomeJob] Found %d newly converted lead(s) to welcome.", len(new_leads))
@@ -158,8 +155,6 @@ def welcome_job() -> None:
     finally:
         db.close()
 
-    logger.info("[WelcomeJob] Run complete.")
-
 # ─── birthday_job ─────────────────────────────────────────────────────────────────────
 # ─── ─────────────────────────────────────────────────────────────────────
 
@@ -183,11 +178,6 @@ def birthday_job() -> None:
         sent_ids = set()
         stored_date = today
 
-    logger.info(
-        "[BirthdayJob] Starting run for %s at %s",
-        today.isoformat(), datetime.now(timezone.utc).isoformat(),
-    )
-
     db = CMSSessionLocal()
     try:
         birthday_clients: list[Client] = (
@@ -201,13 +191,11 @@ def birthday_job() -> None:
         )
 
         if not birthday_clients:
-            logger.info("[BirthdayJob] No birthdays today.")
             if stored_date != (date.fromisoformat(stored_date_str) if stored_date_str else None):
                 _save_state({
                     "birthday_sent_date": stored_date.isoformat(),
                     "birthday_sent_ids": list(sent_ids)
                 })
-                logger.info("[BirthdayJob] Persisted new date to watermark file.")
             return
 
         logger.info("[BirthdayJob] Found %d birthday client(s).", len(birthday_clients))
@@ -250,14 +238,12 @@ def birthday_job() -> None:
                 "birthday_sent_date": stored_date.isoformat(),
                 "birthday_sent_ids": list(sent_ids)
             })
-            logger.info("[BirthdayJob] Birthday state persisted to watermark file.")
 
     except Exception as exc:
         logger.exception("[BirthdayJob] Unexpected error: %s", exc)
     finally:
         db.close()
 
-    logger.info("[BirthdayJob] Run complete.")
 
 
 # ─── Scheduler factory ────────────────────────────────────────────────────────
