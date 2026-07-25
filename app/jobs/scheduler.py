@@ -29,7 +29,7 @@ from sqlalchemy import extract
 from app.database import CMSSessionLocal, LMSSessionLocal
 from app.models.cms_read_db import Client
 from app.models.lms_read_db import Lead, LeadStage
-from app.services.whatsapp import send_welcome_whatsapp, send_birthday_whatsapp
+# from app.services.whatsapp import send_welcome_whatsapp, send_birthday_whatsapp
 from app.services.email import send_welcome_email, send_birthday_email
 
 logger = logging.getLogger(__name__)
@@ -130,10 +130,10 @@ def welcome_job() -> None:
             )
 
             # Send WhatsApp welcome (skip if no phone number)
-            if phone:
-                _run_async(send_welcome_whatsapp(phone, name))
-            else:
-                logger.warning("[WelcomeJob] No phone for lead %s — skipping WhatsApp.", name)
+            # if phone:
+            #     _run_async(send_welcome_whatsapp(phone, name))
+            # else:
+            #     logger.warning("[WelcomeJob] No phone for lead %s — skipping WhatsApp.", name)
 
             # Send email welcome (skip if no email)
             if email:
@@ -218,10 +218,10 @@ def birthday_job() -> None:
             )
 
             # WhatsApp
-            if phone:
-                _run_async(send_birthday_whatsapp(phone, name))
-            else:
-                logger.warning("[BirthdayJob] No phone for %s — skipping WhatsApp.", name)
+            # if phone:
+            #     _run_async(send_birthday_whatsapp(phone, name))
+            # else:
+            #     logger.warning("[BirthdayJob] No phone for %s — skipping WhatsApp.", name)
 
             # Email
             if email:
