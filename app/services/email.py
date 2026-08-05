@@ -56,8 +56,12 @@ def _send_email(
         )
         return False
 
+    auth_token = _API_KEY.strip()
+    if not auth_token.startswith("Zoho-enczapikey"):
+        auth_token = f"Zoho-enczapikey {auth_token}"
+
     headers = {
-        "Authorization": f"Zoho-enczapikey {_API_KEY}",
+        "Authorization": auth_token,
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
