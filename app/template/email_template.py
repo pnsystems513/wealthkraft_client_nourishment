@@ -59,7 +59,7 @@ def _welcome_html(client_name: str) -> str:
                     Thank you for placing your trust in us. We are delighted to be a part of your wealth creation journey.
                   </p>
                   <p style="margin:0 0 16px;color:#546e7a;font-size:15px;line-height:1.8;">
-                    At <strong>WealthKraft</strong>, we believe that successful investing is not about chasing quick returns—it's about
+                    At <strong>WealthKraft</strong>, we believe that successful investing is not about chasing quick returns, it's about
                     building wealth patiently, consistently, and peacefully. Our goal is to help you make informed financial decisions
                     that bring you closer to your dreams and long-term financial freedom.
                   </p>
@@ -105,7 +105,7 @@ def _welcome_html(client_name: str) -> str:
                     Your investment journey begins today, and every disciplined step you take brings you closer to a financially secure future.
                   </p>
                   <p style="margin:0 0 16px;color:#546e7a;font-size:15px;line-height:1.8;">
-                    Thank you once again for choosing <strong>WealthKraft</strong>. We look forward to building your wealth—peacefully.
+                    Thank you once again for choosing <strong>WealthKraft</strong>. We look forward to building your wealth peacefully.
                   </p>
                   <p style="margin:24px 0 0;color:#37474f;font-size:15px;line-height:1.7;">
                     Warm Regards,<br/>
