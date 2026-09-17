@@ -26,10 +26,11 @@ from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import extract
 
-from app.database import CMSSessionLocal, LMSSessionLocal
-from app.models.cms_read_db import Client
+from app.database import LMSSessionLocal, CMSSessionLocal
 from app.models.lms_read_db import Lead, LeadStage
-# from app.services.whatsapp import send_welcome_whatsapp, send_birthday_whatsapp
+from app.models.cms_read_db import Client
+from app.services.whatsapp_welcome import send_welcome_whatsapp
+from app.services.whatsapp_birthday import send_birthday_whatsapp
 from app.services.email import send_welcome_email, send_birthday_email
 
 logger = logging.getLogger(__name__)
@@ -130,10 +131,10 @@ def welcome_job() -> None:
             )
 
             # Send WhatsApp welcome (skip if no phone number)
-            # if phone:
-            #     _run_async(send_welcome_whatsapp(phone, name))
-            # else:
-            #     logger.warning("[WelcomeJob] No phone for lead %s — skipping WhatsApp.", name)
+            if phone:
+                _run_async(send_welcome_whatsapp(phone, name, lead.assigned_name or ""))
+            else:
+                logger.warning("[WelcomeJob] No phone for lead %s — skipping WhatsApp.", name)
 
             # Send email welcome (skip if no email)
             if email:
@@ -160,7 +161,7 @@ def welcome_job() -> None:
 
 def birthday_job() -> None:
     """
-    Query CMS for clients whose date_of_birth matches today's month and day.
+    Query LMS leads whose date_of_birth matches today's month and day.
     For each birthday client (not already sent today), fire WhatsApp + email.
     Deduplicates via an in-memory set that resets each calendar day.
     """
@@ -203,13 +204,13 @@ def birthday_job() -> None:
         new_sent = False
         for client in birthday_clients:
             client_id_str = str(client.id)
+            name = client.full_name or "Valued Client"
             if client_id_str in sent_ids:
                 logger.info(
-                    "[BirthdayJob] Already sent to %s today — skipping.", client.full_name
+                    "[BirthdayJob] Already sent to %s today — skipping.", name
                 )
                 continue
 
-            name = client.full_name or "Valued Client"
             phone = client.mobile_number or ""
             email = client.email or ""
 
@@ -218,10 +219,11 @@ def birthday_job() -> None:
             )
 
             # WhatsApp
-            # if phone:
-            #     _run_async(send_birthday_whatsapp(phone, name))
-            # else:
-            #     logger.warning("[BirthdayJob] No phone for %s — skipping WhatsApp.", name)
+            if phone:
+                agent_name = client.agent_username or client.owner_username or ""
+                _run_async(send_birthday_whatsapp(phone, name, agent_name))
+            else:
+                logger.warning("[BirthdayJob] No phone for %s — skipping WhatsApp.", name)
 
             # Email
             if email:
