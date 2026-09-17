@@ -8,6 +8,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.database import LMSBase, CMSBase, lms_engine, cms_engine
 from app.jobs.scheduler import create_scheduler
@@ -63,7 +64,7 @@ app = FastAPI(
     title="WealthKraft Client Nurturing Engine",
     description=(
         "Microservice that reads CMS & LMS data and proactively nurtures clients "
-        "via WhatsApp (Meta Cloud API) and Email (mailer send).\n\n"
+        "via WhatsApp (AiSensy) and Email (mailer send).\n\n"
         "**Automated flows:**\n"
         "- 🎉 **Welcome** — Sent when a new client is onboarded in CMS\n"
         "- 🎂 **Birthday** — Sent on the client's birthday every year\n\n"
@@ -88,6 +89,13 @@ app.add_middleware(
 # ─────────────────────────────────────────────
 
 app.include_router(nourish_router)
+
+# Serve template images (e.g. birthday.jpeg) at /static/images/<filename>
+app.mount(
+    "/static/images",
+    StaticFiles(directory="app/template/images"),
+    name="template_images",
+)
 
 # ─────────────────────────────────────────────
 # Health check

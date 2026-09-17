@@ -17,3 +17,7 @@ __pycache__/
 
 # Project Specific
 data/watermark.json
+
+# Test scripts
+tests/
+test_*.py
