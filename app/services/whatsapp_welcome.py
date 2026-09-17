@@ -60,7 +60,7 @@ async def _send_template(
         "campaignName": campaign_name,
         "destination": to,
         "userName": agent_name or _USER_NAME,
-        "templateParams": [f"${template_var_name}"],
+        "templateParams": [f"${template_var_name}", f"${template_var_name}"],
         "source": source or "client_nourishiring",
         "media": media or {},
         "buttons": [],
