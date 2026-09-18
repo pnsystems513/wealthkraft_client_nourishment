@@ -59,21 +59,20 @@ async def _send_template(
         )
         return False
 
-    first_name = (client_name.split()[0] if client_name else "user").strip() or "user"
+    display_name = (client_name or "user").strip() or "user"
 
     payload: dict = {
         "apiKey": _API_KEY,
         "campaignName": campaign_name,
         "destination": to,
         "userName": agent_name or _USER_NAME,
-        "templateParams": [f"${template_var_name}"],
+        "templateParams": [display_name],
         "source": source or "client_nourishiring",
         "media": media or {},
         "buttons": [],
         "carouselCards": [],
         "location": {},
         "attributes": {},
-        "paramsFallbackValue": {template_var_name: first_name},
     }
 
     try:
@@ -128,7 +127,7 @@ async def send_birthday_whatsapp(
         # With the default env-configured URL
         await send_birthday_whatsapp(to="919876543210", client_name="Parth Gharat")
     """
-    first_name = client_name.split()[0] if client_name else "there"
+    display_name = (client_name or "there").strip() or "there"
     logger.info("[WhatsApp] Sending birthday message to %s (%s)", to, client_name)
 
     # Resolve media URL: use provided value, else fall back to env
@@ -144,7 +143,7 @@ async def send_birthday_whatsapp(
     return await _send_template(
         to,
         _BIRTHDAY_CAMPAIGN,
-        first_name,
+        display_name,
         agent_name,
         source="new-landing-page form",
         media=media_payload,
