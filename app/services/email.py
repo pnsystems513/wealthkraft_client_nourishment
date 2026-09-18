@@ -159,7 +159,8 @@ def send_birthday_email(to_email: str, client_name: str) -> bool:
         logger.warning("[Email] Skipping birthday email — no email address for %s", client_name)
         return False
 
-    subject = f"Happy Birthday, {client_name.split()[0]}! 🎂 From WealthKraft"
+    display_name = (client_name or "there").strip() or "there"
+    subject = f"Happy Birthday, {display_name}! 🎂 From WealthKraft"
 
     inline_attachments = [
         {
@@ -170,4 +171,4 @@ def send_birthday_email(to_email: str, client_name: str) -> bool:
         }
     ]
 
-    return _send_email(to_email, subject, _birthday_html(client_name), inline_attachments)
+    return _send_email(to_email, subject, _birthday_html(display_name), inline_attachments)

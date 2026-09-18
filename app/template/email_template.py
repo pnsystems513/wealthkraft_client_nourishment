@@ -140,7 +140,7 @@ def _welcome_html(client_name: str) -> str:
 # ─── Birthday Template ────────────────────────────────────────────────────────
 
 def _birthday_html(client_name: str) -> str:
-    first_name = client_name.split()[0] if client_name else "there"
+    display_name = (client_name or "there").strip() or "there"
     return f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -169,7 +169,7 @@ def _birthday_html(client_name: str) -> str:
               <tr>
                 <td style="padding:40px 48px;">
                   <p style="margin:0 0 16px;color:#37474f;font-size:16px;line-height:1.8;">
-                    Dear <strong>{first_name}</strong>,
+                    Dear <strong>{display_name}</strong>,
                   </p>
                   <p style="margin:0 0 16px;color:#37474f;font-size:16px;line-height:1.8;">
                     Wishing you a very <strong>Happy Birthday!</strong> 🎉
