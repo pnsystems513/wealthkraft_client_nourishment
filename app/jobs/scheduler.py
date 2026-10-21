@@ -20,17 +20,19 @@ import os
 import json
 import asyncio
 import logging
+import threading
 from datetime import datetime, date, timezone
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import extract
+from sqlalchemy import extract, func
 
 from app.database import LMSSessionLocal, CMSSessionLocal
 from app.models.lms_read_db import Lead, LeadStage
-from app.models.cms_read_db import Client
+from app.models.cms_read_db import Client, SipHistory
 from app.services.whatsapp_welcome import send_welcome_whatsapp
 from app.services.whatsapp_birthday import send_birthday_whatsapp
+from app.services.whatsapp_sip import send_sip_anniversary_whatsapp
 from app.services.email import send_welcome_email, send_birthday_email
 
 logger = logging.getLogger(__name__)
@@ -39,10 +41,13 @@ logger = logging.getLogger(__name__)
 
 _WELCOME_INTERVAL_SECONDS = 2  # Fixed 2-second interval for welcome job
 _BIRTHDAY_INTERVAL = 1440  # 1 day
+_SIP_ANNIVERSARY_INTERVAL = 1440  # 1 day
+_SCHEDULER_TIMEZONE = "UTC"
 
 # Watermark file — persists the last processed created_at timestamp
 _WATERMARK_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 _WATERMARK_FILE = _WATERMARK_DIR / "watermark.json"
+_STATE_LOCK = threading.Lock()
 
 # ─── State management helpers ───────────────────────────────────────────────────
 
@@ -56,15 +61,20 @@ def _load_state() -> dict:
     return {}
 
 
-def _save_state(data: dict) -> None:
+def _save_state(data: dict) -> bool:
     """Merge and persist state to the JSON file."""
     try:
-        _WATERMARK_DIR.mkdir(parents=True, exist_ok=True)
-        existing = _load_state()
-        existing.update(data)
-        _WATERMARK_FILE.write_text(json.dumps(existing))
+        with _STATE_LOCK:
+            _WATERMARK_DIR.mkdir(parents=True, exist_ok=True)
+            existing = _load_state()
+            existing.update(data)
+            temporary_file = _WATERMARK_FILE.with_suffix(".tmp")
+            temporary_file.write_text(json.dumps(existing), encoding="utf-8")
+            temporary_file.replace(_WATERMARK_FILE)
+        return True
     except Exception as exc:
         logger.warning("[Scheduler] Could not save state: %s", exc)
+        return False
 
 # ─── Helper: run async from sync context ─────────────────────────────────────
 
@@ -76,10 +86,10 @@ def _run_async(coro):
             # If already in an event loop (e.g., some test setups), schedule it
             asyncio.ensure_future(coro)
         else:
-            loop.run_until_complete(coro)
+            return loop.run_until_complete(coro)
     except RuntimeError:
         # No event loop in this thread — create one
-        asyncio.run(coro)
+        return asyncio.run(coro)
 
 
 # ─── welcome_job ─────────────────────────────────────────────────────────────────────
@@ -246,18 +256,103 @@ def birthday_job() -> None:
     finally:
         db.close()
 
+def _today_in_scheduler_timezone() -> date:
+    """Return today's date in the scheduler's configured UTC timezone."""
+    return datetime.now(timezone.utc).date()
+
+
+def sip_anniversary_job() -> None:
+    """Send the first-anniversary message for each client's earliest SIP."""
+    today = _today_in_scheduler_timezone()
+    state = _load_state()
+    stored_date = state.get("sip_anniversary_sent_date")
+    sent_ids = (
+        set(state.get("sip_anniversary_sent_ids", []))
+        if stored_date == today.isoformat()
+        else set()
+    )
+
+    db = CMSSessionLocal()
+    try:
+        oldest_sip_dates = (
+            db.query(
+                SipHistory.client_id.label("client_id"),
+                func.min(SipHistory.created_at).label("oldest_sip_start_date"),
+            )
+            .filter(
+                SipHistory.created_at.isnot(None)
+            )
+            .group_by(SipHistory.client_id)
+            .subquery()
+        )
+        anniversaries = (
+            db.query(Client, oldest_sip_dates.c.oldest_sip_start_date)
+            .join(oldest_sip_dates, oldest_sip_dates.c.client_id == Client.id)
+            .filter(
+                extract("month", oldest_sip_dates.c.oldest_sip_start_date) == today.month,
+                extract("day", oldest_sip_dates.c.oldest_sip_start_date) == today.day,
+                extract("year", oldest_sip_dates.c.oldest_sip_start_date) == today.year - 1,
+            )
+            .all()
+        )
+
+        for client, oldest_sip_start_date in anniversaries:
+            sent_key = f"{client.id}:{today.year}"
+            if sent_key in sent_ids:
+                continue
+
+            phone = client.mobile_number or ""
+            if not phone:
+                logger.warning(
+                    "[SipAnniversaryJob] No phone for client %s — skipping.",
+                    client.full_name,
+                )
+                continue
+
+            agent_name = client.agent_username or client.owner_username or ""
+            was_sent = _run_async(
+                send_sip_anniversary_whatsapp(
+                    phone, client.full_name or "Valued Client", agent_name
+                )
+            )
+            if was_sent is not True:
+                logger.warning(
+                    "[SipAnniversaryJob] Message to %s was not confirmed; "
+                    "leaving it eligible for retry.",
+                    client.full_name,
+                )
+                continue
+
+            sent_ids.add(sent_key)
+            if not _save_state({
+                "sip_anniversary_sent_date": today.isoformat(),
+                "sip_anniversary_sent_ids": sorted(sent_ids),
+            }):
+                raise RuntimeError(
+                    "Could not persist SIP anniversary notification state"
+                )
+
+            logger.info(
+                "[SipAnniversaryJob] First SIP anniversary (%s) message sent to %s.",
+                oldest_sip_start_date,
+                client.full_name,
+            )
+    except Exception as exc:
+        logger.exception("[SipAnniversaryJob] Unexpected error: %s", exc)
+    finally:
+        db.close()
 
 
 # ─── Scheduler factory ────────────────────────────────────────────────────────
 
 def create_scheduler() -> BackgroundScheduler:
     """
-    Create and configure the APScheduler BackgroundScheduler with both nurturing jobs.
+    Create and configure the APScheduler BackgroundScheduler with nurturing jobs.
 
     Returns:
         A configured (but not yet started) BackgroundScheduler instance.
     """
-    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler = BackgroundScheduler(timezone=_SCHEDULER_TIMEZONE)
 
     # Welcome job — poll for new clients every 2 seconds
     scheduler.add_job(
@@ -286,9 +381,24 @@ def create_scheduler() -> BackgroundScheduler:
         next_run_time=datetime.now(timezone.utc),
     )
 
+    # SIP anniversary job — check for anniversary dates every day
+    scheduler.add_job(
+        sip_anniversary_job,
+        trigger="interval",
+        minutes=_SIP_ANNIVERSARY_INTERVAL,
+        id="sip_anniversary_job",
+        name="SIP Anniversary WhatsApp Sender",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=120,
+        next_run_time=datetime.now(timezone.utc),
+    )
+
     logger.info(
-        "[Scheduler] Registered 2 jobs | welcome every %d sec | birthday every %d min",
+        "[Scheduler] Registered 3 jobs | welcome every %d sec | "
+        "birthday every %d min | SIP anniversary every %d min",
         _WELCOME_INTERVAL_SECONDS,
         _BIRTHDAY_INTERVAL,
+        _SIP_ANNIVERSARY_INTERVAL,
     )
     return scheduler
