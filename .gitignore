@@ -21,3 +21,5 @@ data/watermark.json
 # Test scripts
 tests/
 test_*.py
+!tests/
+!tests/test_whatsapp_sip.py
